@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import opennlp.tools.commons.ThreadSafe;
 import opennlp.tools.dictionary.Dictionary;
 import opennlp.tools.ml.EventTrainer;
 import opennlp.tools.ml.TrainerFactory;
@@ -182,7 +183,9 @@ public class TokenizerME extends AbstractTokenizer {
    *
    * @return   A {@link Span} array containing individual tokens as elements.
    */
-  public Span[] tokenizePos(String d) {
+
+   @ThreadSafe
+  public synchronized Span[] tokenizePos(String d) {
     WhitespaceTokenizer whitespaceTokenizer = WhitespaceTokenizer.INSTANCE;
     whitespaceTokenizer.setKeepNewLines(keepNewLines);
     Span[] tokens = whitespaceTokenizer.tokenizePos(d);
@@ -214,8 +217,10 @@ public class TokenizerME extends AbstractTokenizer {
             tokenProb = 1.0;
           }
         }
-        newTokens.add(new Span(start, end));
-        tokProbs.add(tokenProb);
+        synchronized (this) {
+          newTokens.add(new Span(start, end));
+          tokProbs.add(tokenProb);
+        }
       }
     }
 
@@ -254,7 +259,8 @@ public class TokenizerME extends AbstractTokenizer {
   /**
    * @return {@code true} if the tokenizer uses alphanumeric optimization, {@code false} otherwise.
    */
-  public boolean useAlphaNumericOptimization() {
+  @ThreadSafe 
+  public synchronized boolean useAlphaNumericOptimization() {
     return useAlphaNumericOptimization;
   }
 

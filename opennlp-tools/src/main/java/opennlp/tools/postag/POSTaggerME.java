@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import opennlp.tools.commons.ThreadSafe;
 import opennlp.tools.dictionary.Dictionary;
 import opennlp.tools.ml.BeamSearch;
 import opennlp.tools.ml.EventModelSequenceTrainer;
@@ -92,6 +93,8 @@ public class POSTaggerME implements POSTagger {
 
   private final SequenceValidator<String> sequenceValidator;
 
+  private final Object sequenceLock = new Object();
+
   /**
    * Initializes a {@link POSTaggerME} by downloading a default model for a given
    * {@code language}.
@@ -141,8 +144,12 @@ public class POSTaggerME implements POSTagger {
   /**
    * @return Retrieves an array of all possible part-of-speech tags from the tagger.
    */
+
+  @ThreadSafe
   public String[] getAllPosTags() {
-    return model.getOutcomes();
+    synchronized (sequenceLock) {
+      return model.getOutcomes();
+    }
   }
 
   @Override
@@ -150,11 +157,14 @@ public class POSTaggerME implements POSTagger {
     return this.tag(sentence, null);
   }
 
+  @ThreadSafe
   @Override
   public String[] tag(String[] sentence, Object[] additionalContext) {
-    bestSequence = model.bestSequence(sentence, additionalContext, contextGen, sequenceValidator);
-    List<String> t = bestSequence.getOutcomes();
-    return t.toArray(new String[0]);
+    synchronized (sequenceLock) {
+      bestSequence = model.bestSequence(sentence, additionalContext, contextGen, sequenceValidator);
+      List<String> t = bestSequence.getOutcomes();
+      return t.toArray(new String[0]);
+    }
   }
 
   /**
@@ -165,15 +175,17 @@ public class POSTaggerME implements POSTagger {
    *
    * @return At most the specified number of taggings for the specified {@code sentence}.
    */
+  @ThreadSafe
   public String[][] tag(int numTaggings, String[] sentence) {
-    Sequence[] bestSequences = model.bestSequences(numTaggings, sentence, null,
-        contextGen, sequenceValidator);
-    String[][] tags = new String[bestSequences.length][];
-    for (int si = 0; si < tags.length; si++) {
-      List<String> t = bestSequences[si].getOutcomes();
-      tags[si] = t.toArray(new String[0]);
+    synchronized (sequenceLock) {
+      Sequence[] bestSequences = model.bestSequences(numTaggings, sentence, null, contextGen, sequenceValidator);
+      String[][] tags = new String[bestSequences.length][];
+      for (int si = 0; si < tags.length; si++) {
+        List<String> t = bestSequences[si].getOutcomes();
+        tags[si] = t.toArray(new String[0]);
+      }
+      return tags;
     }
-    return tags;
   }
 
   @Override
@@ -181,9 +193,12 @@ public class POSTaggerME implements POSTagger {
     return this.topKSequences(sentence, null);
   }
 
+  @ThreadSafe
   @Override
   public Sequence[] topKSequences(String[] sentence, Object[] additionalContext) {
-    return model.bestSequences(size, sentence, additionalContext, contextGen, sequenceValidator);
+    synchronized (sequenceLock) {
+      return model.bestSequences(size, sentence, additionalContext, contextGen, sequenceValidator);
+    }
   }
 
   /**
@@ -192,53 +207,62 @@ public class POSTaggerME implements POSTagger {
    * @param probs An array to put the probabilities into.
    */
   public void probs(double[] probs) {
-    bestSequence.getProbs(probs);
+    synchronized (sequenceLock) {
+      bestSequence.getProbs(probs);
+    }
   }
 
   /**
    * @return An array with the probabilities for each tag of the last tagged sentence.
    */
   public double[] probs() {
-    return bestSequence.getProbs();
+    synchronized (sequenceLock) {
+      return bestSequence.getProbs();
+    }
   }
 
   public String[] getOrderedTags(List<String> words, List<String> tags, int index) {
-    return getOrderedTags(words,tags,index,null);
+    synchronized (sequenceLock) {
+      return getOrderedTags(words,tags,index,null);
+    }
   }
 
+  @ThreadSafe
   public String[] getOrderedTags(List<String> words, List<String> tags, int index,double[] tprobs) {
+    synchronized (sequenceLock) {
+      if (modelPackage.getPosModel() != null) {
 
-    if (modelPackage.getPosModel() != null) {
-
-      MaxentModel posModel = modelPackage.getPosModel();
-
-      double[] probs = posModel.eval(contextGen.getContext(index,
-          words.toArray(new String[0]),
-          tags.toArray(new String[0]),null));
-
-      String[] orderedTags = new String[probs.length];
-      for (int i = 0; i < probs.length; i++) {
-        int max = 0;
-        for (int ti = 1; ti < probs.length; ti++) {
-          if (probs[ti] > probs[max]) {
-            max = ti;
+        MaxentModel posModel = modelPackage.getPosModel();
+  
+        double[] probs = posModel.eval(contextGen.getContext(index,
+            words.toArray(new String[0]),
+            tags.toArray(new String[0]),null));
+  
+        String[] orderedTags = new String[probs.length];
+        for (int i = 0; i < probs.length; i++) {
+          int max = 0;
+          for (int ti = 1; ti < probs.length; ti++) {
+            if (probs[ti] > probs[max]) {
+              max = ti;
+            }
           }
+          orderedTags[i] = posModel.getOutcome(max);
+          if (tprobs != null) {
+            tprobs[i] = probs[max];
+          }
+          probs[max] = 0;
         }
-        orderedTags[i] = posModel.getOutcome(max);
-        if (tprobs != null) {
-          tprobs[i] = probs[max];
-        }
-        probs[max] = 0;
+        return orderedTags;
       }
-      return orderedTags;
-    }
-    else {
-      throw new UnsupportedOperationException("This method can only be called if the "
-          + "classification model is an event model!");
+      else {
+        throw new UnsupportedOperationException("This method can only be called if the "
+            + "classification model is an event model!");
+      }
     }
   }
 
-  public static POSModel train(String languageCode,
+  @ThreadSafe
+  public static synchronized POSModel train(String languageCode,
       ObjectStream<POSSample> samples, TrainingParameters trainParams,
       POSTaggerFactory posFactory) throws IOException {
 
@@ -296,7 +320,9 @@ public class POSTaggerME implements POSTagger {
    *
    * @throws IOException Thrown if IO errors occurred during dictionary construction.
    */
-  public static Dictionary buildNGramDictionary(ObjectStream<POSSample> samples, int cutoff)
+
+   @ThreadSafe
+  public static synchronized Dictionary buildNGramDictionary(ObjectStream<POSSample> samples, int cutoff)
       throws IOException {
 
     NGramModel ngramModel = new NGramModel();
@@ -322,7 +348,9 @@ public class POSTaggerME implements POSTagger {
    *
    * @throws IOException Thrown if IO errors occurred during dictionary construction.
    */
-  public static void populatePOSDictionary(ObjectStream<POSSample> samples,
+
+   @ThreadSafe
+  public static synchronized void populatePOSDictionary(ObjectStream<POSSample> samples,
       MutableTagDictionary dict, int cutoff) throws IOException {
 
     logger.info("Expanding POS Dictionary ...");

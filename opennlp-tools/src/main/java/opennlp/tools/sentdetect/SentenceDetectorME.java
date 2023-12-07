@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import opennlp.tools.commons.ThreadSafe;
 import opennlp.tools.dictionary.Dictionary;
 import opennlp.tools.ml.EventTrainer;
 import opennlp.tools.ml.TrainerFactory;
@@ -179,8 +180,9 @@ public class SentenceDetectorME implements SentenceDetector {
    *           every sentence.
    *
    */
+  @ThreadSafe
   @Override
-  public Span[] sentPosDetect(CharSequence s) {
+  public synchronized Span[] sentPosDetect(CharSequence s) {
     sentProbs.clear();
     List<Integer> enders = scanner.getPositions(s);
     List<Integer> positions = new ArrayList<>(enders.size());
@@ -291,12 +293,16 @@ public class SentenceDetectorME implements SentenceDetector {
    *     call to {@link SentenceDetectorME#sentDetect(CharSequence)}.
    *     If not applicable, an empty array is returned.
    */
+
+  @ThreadSafe
   public double[] getSentenceProbabilities() {
-    double[] sentProbArray = new double[sentProbs.size()];
-    for (int i = 0; i < sentProbArray.length; i++) {
-      sentProbArray[i] = sentProbs.get(i);
+    synchronized (this) {
+      double[] sentProbArray = new double[sentProbs.size()];
+      for (int i = 0; i < sentProbArray.length; i++) {
+        sentProbArray[i] = sentProbs.get(i);
+      }
+      return sentProbArray;
     }
-    return sentProbArray;
   }
 
   /**
