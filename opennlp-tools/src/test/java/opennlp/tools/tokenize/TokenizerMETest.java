@@ -137,4 +137,25 @@ public class TokenizerMETest {
         tokenizer.tokenize("a\r\n\r\n b\r\n\r\n c"));
   }
 
+  @Test
+  void testTokenizePosThreadSafety() throws InterruptedException {
+    TokenizerModel model = TokenizerTestUtil.createMaxentTokenModel();
+    TokenizerME tokenizer = new TokenizerME(model);
+
+    String sampleText = "This is a sample text for testing.";
+    Runnable task = () -> {
+      Span[] tokens = tokenizer.tokenizePos(sampleText);
+    };
+
+    int numberOfThreads = 10;
+    Thread[] threads = new Thread[numberOfThreads];
+    for (int i = 0; i < numberOfThreads; i++) {
+      threads[i] = new Thread(task);
+      threads[i].start();
+    }
+    for (int i = 0; i < numberOfThreads; i++) {
+      threads[i].join();
+    }
+  }
+
 }

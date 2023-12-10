@@ -111,4 +111,28 @@ public class SentenceDetectorMEIT {
 
   }
 
+  //tests the sentPosDetect and getSentenceProbabilities functions for threadsafe functionality
+  @Test
+  void testThreadSafeSentenceDetection() throws InterruptedException {
+    SentenceDetectorME sentDetect = new SentenceDetectorME("en");
+    String sampleSentences = "This is a test. There are many tests, this is the second.";
+
+    Runnable task = () -> {
+      Span[] pos = sentDetect.sentPosDetect(sampleSentences);
+      double[] probs = sentDetect.getSentenceProbabilities();
+    };
+
+    int numberOfThreads = 10; // Number of threads to test concurrency
+    Thread[] threads = new Thread[numberOfThreads];
+
+    for (int i = 0; i < numberOfThreads; i++) {
+      threads[i] = new Thread(task);
+      threads[i].start();
+    }
+
+    for (int i = 0; i < numberOfThreads; i++) {
+      threads[i].join();
+    }
+  }
+
 }

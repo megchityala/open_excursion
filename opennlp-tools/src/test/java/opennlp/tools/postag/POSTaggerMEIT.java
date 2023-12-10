@@ -22,7 +22,67 @@ import java.io.IOException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import opennlp.tools.postag.POSTaggerME;
+import opennlp.tools.postag.POSTagger;
+import opennlp.tools.util.Sequence;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 public class POSTaggerMEIT {
+
+
+  private static POSTaggerME tagger;
+
+  @BeforeAll
+  static void setup() throws IOException {
+      POSModel model = new POSModel(new FileInputStream("path/to/your/model.bin"));
+      tagger = new POSTaggerME(model);
+  }
+
+  @Test
+    void testGetAllPosTagsThreadSafety() throws InterruptedException {
+      executeConcurrent(() -> {
+          String[] tags = tagger.getAllPosTags();
+      });
+  }
+
+  @Test
+  void testTagThreadSafety() throws InterruptedException {
+      executeConcurrent(() -> {
+          String[] sentence = {"This", "is", "a", "test"};
+          String[] tags = tagger.tag(sentence);
+      });
+  }
+
+  @Test
+  void testTopKSequencesThreadSafety() throws InterruptedException {
+      executeConcurrent(() -> {
+          String[] sentence = {"This", "is", "a", "test"};
+          Sequence[] sequences = tagger.topKSequences(sentence);
+      });
+  }
+
+  @Test
+  void testProbsThreadSafety() throws InterruptedException {
+      executeConcurrent(() -> {
+          double[] probs = tagger.probs();
+      });
+  }
+
+  private void executeConcurrent(Runnable task) throws InterruptedException {
+      int numberOfThreads = 10;
+      Thread[] threads = new Thread[numberOfThreads];
+      for (int i = 0; i < numberOfThreads; i++) {
+          threads[i] = new Thread(task);
+          threads[i].start();
+      }
+      for (int i = 0; i < numberOfThreads; i++) {
+          threads[i].join();
+      }
+  }
+
 
   @Test
   void testPOSTagger() throws IOException {
