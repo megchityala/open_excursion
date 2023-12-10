@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 
 public class POSTaggerMEIT {
 
+
   private static POSTaggerME tagger;
 
   @BeforeAll
