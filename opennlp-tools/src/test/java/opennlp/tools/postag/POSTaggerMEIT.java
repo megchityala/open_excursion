@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 
 public class POSTaggerMEIT {
 
-
   private static POSTaggerME tagger;
 
   @BeforeAll
@@ -42,10 +41,10 @@ public class POSTaggerMEIT {
   }
 
   @Test
-    void testGetAllPosTagsThreadSafety() throws InterruptedException {
-      executeConcurrent(() -> {
-          String[] tags = tagger.getAllPosTags();
-      });
+  void testGetAllPosTagsThreadSafety() throws InterruptedException {
+    executeConcurrent(() -> {
+        String[] tags = tagger.getAllPosTags();
+    });
   }
 
   @Test
