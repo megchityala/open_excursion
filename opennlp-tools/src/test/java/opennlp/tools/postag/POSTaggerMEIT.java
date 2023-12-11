@@ -34,6 +34,7 @@ public class POSTaggerMEIT {
 
   private static POSTaggerME tagger;
 
+
   @BeforeAll
   static void setup() throws IOException {
       POSModel model = new POSModel(new FileInputStream("path/to/your/model.bin"));
